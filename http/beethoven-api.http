@@ -1,0 +1,23 @@
+### Variáveis
+@baseUrl = http://localhost:3002
+
+### 1) Criar artista (execute e copie o _id para o ficheiro payload-all-i-need.json no campo artistId)
+POST {{baseUrl}}/artists
+Content-Type: application/json
+
+{
+  "name": "Matchbox Twenty"
+}
+
+### 2) Inserir faixa all_i_need (lyricsVariants: match + ai)
+# Antes: substitua artistId em ./payload-all-i-need.json pelo _id devolvido acima (24 caracteres hex).
+POST {{baseUrl}}/tracks
+Content-Type: application/json
+
+< ./payload-all-i-need.json
+
+### 3) Consultar por slug da pasta
+GET {{baseUrl}}/tracks/by-track-id/all_i_need
+
+### 4) Listar faixas de um artista
+GET {{baseUrl}}/tracks?artistId=507f191e810c19729de860ea
