@@ -129,6 +129,21 @@ export class Track {
   @Prop({ trim: true, required: false })
   standard_tune?: string;
 
+  /** Referência ao utilizador Auth0 (`sub`) que criou esta versão da cifra. */
+  @Prop({ trim: true, index: true })
+  userId?: string;
+
+  /** Afinação original da cifra (texto livre para a sidebar, ex.: «E standard»). */
+  @Prop({ trim: true, default: '' })
+  original_tune?: string;
+
+  /** Traste do capo (0 = sem capo). */
+  @Prop({ default: 0 })
+  capo_at?: number;
+
+  @Prop({ default: false, index: true })
+  is_private?: boolean;
+
   @Prop({ type: [TranscriptionChordEventSchema], default: [] })
   chords: TranscriptionChordEventSubdoc[];
 

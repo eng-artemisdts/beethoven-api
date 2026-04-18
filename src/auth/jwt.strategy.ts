@@ -11,19 +11,31 @@ export type Auth0JwtPayload = {
   [key: string]: unknown;
 };
 
+/** Evita issuer/JWKS errados se AUTH0_DOMAIN vier com https:// ou barra final. */
+function normalizeAuth0Domain(raw: string): string {
+  let d = raw.trim();
+  d = d.replace(/^https?:\/\//i, '');
+  d = d.replace(/\/+$/, '');
+  return d;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(config: ConfigService) {
-
-    const domain = config.get<string>('AUTH0_DOMAIN')?.trim();
+    const domain = normalizeAuth0Domain(
+      config.get<string>('AUTH0_DOMAIN') ?? '',
+    );
     const audience = config.get<string>('AUTH0_AUDIENCE')?.trim();
-
+    const issuerOverride = config.get<string>('AUTH0_ISSUER')?.trim();
     if (!domain || !audience) {
       throw new Error(
         'Defina AUTH0_DOMAIN e AUTH0_AUDIENCE no ambiente (identificador da API no Auth0).',
       );
     }
-    const issuer = `https://${domain}/`;
+    const issuer = issuerOverride
+      ? `${issuerOverride.replace(/\/+$/, '')}/`
+      : `https://${domain}/`;
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       audience,

@@ -11,10 +11,31 @@ Content-Type: application/json
 
 ### 2) Inserir faixa all_i_need (lyricsVariants: match + ai)
 # Antes: substitua artistId em ./payload-all-i-need.json pelo _id devolvido acima (24 caracteres hex).
+#
+# Campos opcionais de versão / Pro (pode acrescentar ao JSON do ficheiro):
+#   userId        — string, referência ao criador (ex.: sub do Auth0)
+#   original_tune — string, afinação original (texto livre)
+#   capo_at       — inteiro 0–24, traste do capo
+#   is_private    — boolean, cifra só visível ao autor (Pro)
 POST {{baseUrl}}/tracks
 Content-Type: application/json
 
 < ./payload-all-i-need.json
+
+### 2b) Criar faixa mínima com campos de versão (substitua artistId pelo _id do passo 1)
+POST {{baseUrl}}/tracks
+Content-Type: application/json
+
+{
+  "artistId": "COLOQUE_AQUI_O_OBJECTID_DO_ARTISTA",
+  "trackId": "demo_versao_campos",
+  "name": "Demo versão",
+  "userId": "auth0|507f1f77bcf86cd799439011",
+  "original_tune": "E standard",
+  "capo_at": 2,
+  "is_private": false,
+  "chords": []
+}
 
 ### 3) Consultar por slug da pasta
 GET {{baseUrl}}/tracks/by-track-id/all_i_need

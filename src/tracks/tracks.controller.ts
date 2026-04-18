@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CreateTrackDto } from './dto/create-track.dto';
 import { TracksService } from './tracks.service';
 
@@ -20,6 +20,17 @@ export class TracksController {
   @Get('by-track-id/:trackId')
   findByTrackId(@Param('trackId') trackId: string) {
     return this.tracksService.findByTrackId(trackId);
+  }
+
+  @Patch('by-track-id/:trackId')
+  patchByTrackId(
+    @Param('trackId') trackId: string,
+    @Body() body: { chords?: unknown; lyricsVariants?: Record<string, unknown> },
+  ) {
+    return this.tracksService.updateTranscriptionByTrackId(trackId, {
+      chords: body.chords,
+      lyricsVariants: body.lyricsVariants,
+    });
   }
 
   @Get(':id')

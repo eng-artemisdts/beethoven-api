@@ -1,9 +1,13 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
+  IsInt,
   IsMongoId,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import type {
@@ -67,6 +71,25 @@ export class CreateTrackDto {
   @IsOptional()
   @IsString()
   standard_tune?: string;
+
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @IsOptional()
+  @IsString()
+  original_tune?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(24)
+  capo_at?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  is_private?: boolean;
 
   /** Eventos de acorde no formato de chords.json */
   @IsOptional()

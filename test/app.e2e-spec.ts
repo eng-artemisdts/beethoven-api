@@ -1,3 +1,5 @@
+/** Só para este ficheiro e2e: AppModule usa guard permissivo (Nest 11 regista APP_GUARD com token interno UUID). */
+process.env.BEETHOVEN_E2E = '1';
 process.env.AUTH0_DOMAIN ??= 'test-tenant.us.auth0.com';
 process.env.AUTH0_AUDIENCE ??= 'https://beethoven-api-test';
 
@@ -6,7 +8,6 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
-import { JwtAuthGuard } from './../src/auth/jwt-auth.guard';
 
 jest.setTimeout(30_000);
 
@@ -16,10 +17,7 @@ describe('beethoven-api (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    })
-      .overrideGuard(JwtAuthGuard)
-      .useValue({ canActivate: () => true })
-      .compile();
+    }).compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(

@@ -6,6 +6,7 @@ import { ArtistsModule } from './artists/artists.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { HealthController } from './health/health.controller';
+import { LibraryHomeModule } from './library-home/library-home.module';
 import { TracksModule } from './tracks/tracks.module';
 
 @Module({
@@ -22,11 +23,16 @@ import { TracksModule } from './tracks/tracks.module';
           : {}),
       }),
     }),
-    // AuthModule,
+    AuthModule,
     ArtistsModule,
     TracksModule,
+    LibraryHomeModule,
   ],
   controllers: [HealthController],
-  // providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
+  // providers: [
+  //   process.env.BEETHOVEN_E2E === '1'
+  //     ? { provide: APP_GUARD, useValue: { canActivate: () => true } }
+  //     : { provide: APP_GUARD, useClass: JwtAuthGuard },
+  // ],
 })
 export class AppModule { }

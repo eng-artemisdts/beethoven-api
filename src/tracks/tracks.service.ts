@@ -9,7 +9,9 @@ import { rethrowAsConflictIfDuplicateKey } from '../common/mongo-duplicate-key';
 import type { TranscriptionLyricsVariants } from '../domain/music-transcription.types';
 import { ArtistsService } from '../artists/artists.service';
 import { CreateTrackDto } from './dto/create-track.dto';
+import type { TranscriptionLyricsVariantsSubdoc } from './schemas/track.schema';
 import { Track, TrackDocument } from './schemas/track.schema';
+import { normalizeChordListFromClient } from './transcription-chord-normalize.util';
 
 @Injectable()
 export class TracksService {
@@ -102,5 +104,35 @@ export class TracksService {
       );
     }
     return track;
+  }
+
+  /** Atualização parcial de acordes / letras (sem verificação de dono — ativar JWT em produção). */
+  async updateTranscriptionByTrackId(
+    trackId: string,
+    body: {
+      chords?: unknown;
+      lyricsVariants?: Partial<TranscriptionLyricsVariantsSubdoc>;
+    },
+  ): Promise<TrackDocument> {
+    const track = await this.findByTrackId(trackId);
+    if (body.chords !== undefined) {
+      const durationSec = track.meta?.duration_seconds;
+      track.chords = normalizeChordListFromClient(body.chords, durationSec);
+      track.markModified('chords');
+    }
+    if (body.lyricsVariants !== undefined) {
+      const cur = track.lyricsVariants ?? {};
+      const next: TranscriptionLyricsVariantsSubdoc = { ...cur };
+      if (body.lyricsVariants.ai !== undefined) {
+        next.ai = body.lyricsVariants.ai as TranscriptionLyricsVariantsSubdoc['ai'];
+      }
+      if (body.lyricsVariants.match !== undefined) {
+        next.match = body.lyricsVariants.match as TranscriptionLyricsVariantsSubdoc['match'];
+      }
+      track.lyricsVariants = next;
+      track.markModified('lyricsVariants');
+    }
+    await track.save();
+    return this.findByTrackId(trackId);
   }
 }
