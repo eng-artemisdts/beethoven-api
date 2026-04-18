@@ -17,6 +17,7 @@ async function bootstrap() {
     });
   }
 
-  await app.listen(process.env.PORT ?? 3000);
+  /** Por defeito 3002 para não colidir com Next (3000) nem com Schubert (3001 no repo). */
+  await app.listen(process.env.PORT ?? 3002);
 }
 bootstrap();

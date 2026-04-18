@@ -1,93 +1,93 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { Artist, ArtistDocument } from '../artists/schemas/artist.schema';
 import { Track, TrackDocument } from '../tracks/schemas/track.schema';
-import {
-  LibraryRecommendation,
-  LibraryRecommendationDocument,
-} from './schemas/library-recommendation.schema';
 import {
   LibraryTrackAccess,
   LibraryTrackAccessDocument,
 } from './schemas/library-track-access.schema';
 
+function escapeRegexFragment(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export type LibrarySearchTrackRow = {
+  id: string;
+  trackKey: string | null;
+  name: string;
+  artistName: string;
+  artistId: string;
+  imageUrl: string | null;
+};
+
+export type LibrarySearchResponse = {
+  items: LibrarySearchTrackRow[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
 @Injectable()
 export class LibraryHomeService {
   constructor(
-    @InjectModel(LibraryRecommendation.name)
-    private readonly recommendationModel: Model<LibraryRecommendationDocument>,
     @InjectModel(LibraryTrackAccess.name)
     private readonly trackAccessModel: Model<LibraryTrackAccessDocument>,
     @InjectModel(Track.name)
     private readonly trackModel: Model<TrackDocument>,
-  ) { }
+    @InjectModel(Artist.name)
+    private readonly artistModel: Model<ArtistDocument>,
+  ) {}
 
-  private async hydrateTracksByIds(
-    trackIds: Types.ObjectId[],
+  /** Resolve documentos de faixa a partir dos registos de acesso (ObjectId e/ou trackKey). */
+  private async hydrateTracksFromAccesses(
+    accesses: LibraryTrackAccessDocument[],
     limit: number,
   ): Promise<TrackDocument[]> {
-    if (!trackIds.length) return [];
-    const tracks = (await this.trackModel
-      .find({ _id: { $in: trackIds } })
-      .populate('artistId', 'name')
-      .exec()) as TrackDocument[];
-    const byId = new Map(tracks.map((track) => [String(track._id), track]));
-    const ordered: TrackDocument[] = [];
-    for (const id of trackIds) {
-      const track = byId.get(String(id));
-      if (track) ordered.push(track);
-      if (ordered.length >= limit) break;
+    const resolved: TrackDocument[] = [];
+    const seen = new Set<string>();
+
+    for (const access of accesses) {
+      let doc: TrackDocument | null = null;
+
+      if (access.trackId) {
+        doc = (await this.trackModel
+          .findById(access.trackId)
+          .populate('artistId', 'name')
+          .exec()) as TrackDocument | null;
+      }
+      if (!doc && access.trackKey?.trim()) {
+        doc = (await this.trackModel
+          .findOne({ trackId: access.trackKey.trim() })
+          .populate('artistId', 'name')
+          .exec()) as TrackDocument | null;
+      }
+
+      if (doc && !seen.has(String(doc._id))) {
+        seen.add(String(doc._id));
+        resolved.push(doc);
+      }
+      if (resolved.length >= limit) break;
     }
-    return ordered;
+
+    return resolved;
   }
 
+  /**
+   * Lista para a secção «Descobre» até existir motor de recomendação dedicado
+   * (serviço gerenciado, vector search ou modelo batch). Enquanto isso: catálogo recente.
+   */
   private async getRecommendedTracks(
-    userId: string | undefined,
+    _userId: string | undefined,
     limit: number,
   ): Promise<TrackDocument[]> {
-    const now = new Date();
-    const baseFilter = {
-      isActive: true,
-      $and: [
-        { $or: [{ startsAt: { $exists: false } }, { startsAt: { $lte: now } }] },
-        { $or: [{ endsAt: { $exists: false } }, { endsAt: { $gte: now } }] },
-      ],
-    };
-
-    const globalRecommendations = await this.recommendationModel
-      .find({
-        ...baseFilter,
-        $or: [{ userId: { $exists: false } }, { userId: null }, { userId: '' }],
-      })
-      .sort({ score: -1, createdAt: -1, _id: -1 })
-      .limit(limit)
-      .exec();
-
-    const userRecommendations = userId
-      ? await this.recommendationModel
-        .find({ ...baseFilter, userId })
-        .sort({ score: -1, createdAt: -1, _id: -1 })
-        .limit(limit)
-        .exec()
-      : [];
-
-    const combinedTrackIds = [...userRecommendations, ...globalRecommendations]
-      .map((row) => row.trackId)
-      .filter((value, index, arr) => index === arr.findIndex((x) => String(x) === String(value)))
-      .slice(0, limit);
-
-    const curatedTracks = await this.hydrateTracksByIds(combinedTrackIds, limit);
-    if (curatedTracks.length >= limit) return curatedTracks;
-
-    const excludeIds = curatedTracks.map((track) => track._id);
-    const fillTracks = await this.trackModel
-      .find({ _id: { $nin: excludeIds } })
+    return this.trackModel
+      .find({})
       .populate('artistId', 'name')
       .sort({ createdAt: -1, _id: -1 })
-      .limit(limit - curatedTracks.length)
+      .limit(limit)
       .exec();
-
-    return [...curatedTracks, ...fillTracks];
   }
 
   private async getRecentTracks(
@@ -108,8 +108,7 @@ export class LibraryHomeService {
       .sort({ lastAccessAt: -1, _id: -1 })
       .limit(limit)
       .exec();
-    const recentTrackIds = accesses.map((item) => item.trackId);
-    const recentTracks = await this.hydrateTracksByIds(recentTrackIds, limit);
+    const recentTracks = await this.hydrateTracksFromAccesses(accesses, limit);
     if (recentTracks.length >= limit) return recentTracks;
 
     const filledTracks = await this.trackModel
@@ -144,8 +143,14 @@ export class LibraryHomeService {
     if (!Types.ObjectId.isValid(params.trackId)) return;
 
     const trackObjectId = new Types.ObjectId(params.trackId);
-    const exists = await this.trackModel.exists({ _id: trackObjectId });
-    if (!exists) return;
+    const track = await this.trackModel.findOne({ _id: trackObjectId }).select('trackId').exec();
+    if (!track) return;
+
+    const key = typeof track.trackId === 'string' ? track.trackId.trim() : '';
+    if (key) {
+      await this.registerTrackAccessByKey({ userId, trackKey: key });
+      return;
+    }
 
     const now = new Date();
     await this.trackAccessModel.updateOne(
@@ -157,28 +162,120 @@ export class LibraryHomeService {
       },
       { upsert: true },
     );
-
-    await this.recommendationModel.updateOne(
-      { userId, trackId: trackObjectId },
-      {
-        $set: { isActive: true, source: 'history' },
-        $inc: { score: 1 },
-      },
-      { upsert: true },
-    );
   }
 
   async registerTrackAccessByKey(params: {
     userId: string;
     trackKey: string;
   }): Promise<void> {
+    const userId = params.userId.trim();
     const key = params.trackKey.trim();
-    if (!key) return;
+    if (!userId || !key) return;
+
     const track = await this.trackModel.findOne({ trackId: key }).select('_id').exec();
-    if (!track) return;
-    await this.registerTrackAccess({
-      userId: params.userId,
-      trackId: String(track._id),
-    });
+
+    const now = new Date();
+    const $set: Record<string, unknown> = {
+      lastAccessAt: now,
+      trackKey: key,
+    };
+    if (track) {
+      $set.trackId = track._id;
+    }
+
+    await this.trackAccessModel.updateOne(
+      { userId, trackKey: key },
+      {
+        $set: $set,
+        $setOnInsert: { firstAccessAt: now },
+        $inc: { accessCount: 1 },
+      },
+      { upsert: true },
+    );
+  }
+
+  private serializeSearchTrack(track: TrackDocument): LibrarySearchTrackRow {
+    const populated = track.artistId as unknown as
+      | ArtistDocument
+      | Types.ObjectId
+      | string
+      | null;
+    let artistName = 'Artista desconhecido';
+    let artistIdStr = '';
+    if (populated && typeof populated === 'object' && 'name' in populated) {
+      artistName =
+        typeof populated.name === 'string' && populated.name.trim()
+          ? populated.name.trim()
+          : artistName;
+      artistIdStr =
+        '_id' in populated && populated._id
+          ? String(populated._id)
+          : '';
+    }
+
+    const trackKey =
+      typeof track.trackId === 'string' && track.trackId.trim()
+        ? track.trackId.trim()
+        : null;
+
+    return {
+      id: String(track._id),
+      trackKey,
+      name: typeof track.name === 'string' && track.name.trim() ? track.name.trim() : 'Sem nome',
+      artistName,
+      artistId: artistIdStr,
+      imageUrl: null,
+    };
+  }
+
+  async searchTracks(params: {
+    search: string;
+    page: number;
+    limit: number;
+  }): Promise<LibrarySearchResponse> {
+    const raw = params.search.trim();
+    const page = params.page;
+    const limit = params.limit;
+
+    if (!raw) {
+      return { items: [], total: 0, page, limit, totalPages: 0 };
+    }
+
+    const escaped = escapeRegexFragment(raw);
+    const matchingArtists = await this.artistModel
+      .find({ name: { $regex: escaped, $options: 'i' } })
+      .select('_id')
+      .exec();
+    const artistIds = matchingArtists.map((a) => a._id);
+
+    const filter: Record<string, unknown> = {
+      $or: [
+        { name: { $regex: escaped, $options: 'i' } },
+        ...(artistIds.length ? [{ artistId: { $in: artistIds } }] : []),
+      ],
+    };
+
+    const skip = (page - 1) * limit;
+
+    const [documents, total] = await Promise.all([
+      this.trackModel
+        .find(filter)
+        .populate('artistId', 'name')
+        .sort({ updatedAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.trackModel.countDocuments(filter).exec(),
+    ]);
+
+    const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+
+    return {
+      items: documents.map((doc) => this.serializeSearchTrack(doc)),
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 }
