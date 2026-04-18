@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import type { LyricsSource } from '../domain/music-transcription.types';
 import { CreateTrackDto } from './dto/create-track.dto';
 import { TracksService } from './tracks.service';
 
@@ -25,11 +26,17 @@ export class TracksController {
   @Patch('by-track-id/:trackId')
   patchByTrackId(
     @Param('trackId') trackId: string,
-    @Body() body: { chords?: unknown; lyricsVariants?: Record<string, unknown> },
+    @Body()
+    body: {
+      chords?: unknown;
+      lyrics?: unknown;
+      lyricsSource?: LyricsSource;
+    },
   ) {
     return this.tracksService.updateTranscriptionByTrackId(trackId, {
       chords: body.chords,
-      lyricsVariants: body.lyricsVariants,
+      lyrics: body.lyrics,
+      lyricsSource: body.lyricsSource,
     });
   }
 

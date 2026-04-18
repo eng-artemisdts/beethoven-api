@@ -6,10 +6,10 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { rethrowAsConflictIfDuplicateKey } from '../common/mongo-duplicate-key';
-import type { TranscriptionLyricsVariants } from '../domain/music-transcription.types';
+import type { LyricsSource } from '../domain/music-transcription.types';
 import { ArtistsService } from '../artists/artists.service';
 import { CreateTrackDto } from './dto/create-track.dto';
-import type { TranscriptionLyricsVariantsSubdoc } from './schemas/track.schema';
+import type { TranscriptionLyricSegmentSubdoc } from './schemas/track.schema';
 import { Track, TrackDocument } from './schemas/track.schema';
 import { normalizeChordListFromClient } from './transcription-chord-normalize.util';
 
@@ -20,39 +20,34 @@ export class TracksService {
     private readonly artistsService: ArtistsService,
   ) {}
 
-  private resolveLyricsVariants(
-    dto: CreateTrackDto,
-  ): TranscriptionLyricsVariants | undefined {
-    const v = dto.lyricsVariants;
-    const legacy = dto.lyrics;
-    if (!v && !legacy?.length) {
-      return undefined;
+  /** Deriva `lyrics` + `lyricsSource` a partir do DTO (`lyricsSource` omisso ⇒ `MATCH`). */
+  private resolveLyricsPayload(dto: CreateTrackDto): {
+    lyrics: TranscriptionLyricSegmentSubdoc[];
+    lyricsSource: LyricsSource;
+  } | undefined {
+    const newLyrics = dto.lyrics;
+    const newSource = dto.lyricsSource;
+    if (newLyrics !== undefined && newLyrics.length > 0) {
+      const source: LyricsSource = newSource ?? 'MATCH';
+      return { lyrics: newLyrics as TranscriptionLyricSegmentSubdoc[], lyricsSource: source };
     }
-    const out: TranscriptionLyricsVariants = { ...(v ?? {}) };
-    if (legacy?.length && out.match === undefined) {
-      out.match = legacy;
-    }
-    const hasAi = out.ai !== undefined && out.ai.length > 0;
-    const hasMatch = out.match !== undefined && out.match.length > 0;
-    if (!hasAi && !hasMatch) {
-      return undefined;
-    }
-    return {
-      ...(hasAi ? { ai: out.ai } : {}),
-      ...(hasMatch ? { match: out.match } : {}),
-    };
+
+    return undefined;
   }
 
   async create(dto: CreateTrackDto): Promise<TrackDocument> {
     await this.artistsService.findOne(dto.artistId);
-    const resolvedLyricsVariants = this.resolveLyricsVariants(dto);
-    const { artistId, lyrics, lyricsVariants, ...rest } = dto;
-    void lyrics;
-    void lyricsVariants;
+    const resolvedLyrics = this.resolveLyricsPayload(dto);
+    const { artistId, lyrics: _lyrics, lyricsSource: _ls, ...rest } = dto;
+    void _lyrics;
+    void _ls;
     const doc = new this.trackModel({
       ...rest,
-      ...(resolvedLyricsVariants
-        ? { lyricsVariants: resolvedLyricsVariants }
+      ...(resolvedLyrics
+        ? {
+            lyrics: resolvedLyrics.lyrics,
+            lyricsSource: resolvedLyrics.lyricsSource,
+          }
         : {}),
       artistId: new Types.ObjectId(artistId),
     });
@@ -111,7 +106,8 @@ export class TracksService {
     trackId: string,
     body: {
       chords?: unknown;
-      lyricsVariants?: Partial<TranscriptionLyricsVariantsSubdoc>;
+      lyrics?: unknown;
+      lyricsSource?: LyricsSource;
     },
   ): Promise<TrackDocument> {
     const track = await this.findByTrackId(trackId);
@@ -120,17 +116,13 @@ export class TracksService {
       track.chords = normalizeChordListFromClient(body.chords, durationSec);
       track.markModified('chords');
     }
-    if (body.lyricsVariants !== undefined) {
-      const cur = track.lyricsVariants ?? {};
-      const next: TranscriptionLyricsVariantsSubdoc = { ...cur };
-      if (body.lyricsVariants.ai !== undefined) {
-        next.ai = body.lyricsVariants.ai as TranscriptionLyricsVariantsSubdoc['ai'];
-      }
-      if (body.lyricsVariants.match !== undefined) {
-        next.match = body.lyricsVariants.match as TranscriptionLyricsVariantsSubdoc['match'];
-      }
-      track.lyricsVariants = next;
-      track.markModified('lyricsVariants');
+    if (body.lyrics !== undefined) {
+      track.lyrics = body.lyrics as TranscriptionLyricSegmentSubdoc[];
+      track.markModified('lyrics');
+    }
+    if (body.lyricsSource !== undefined) {
+      track.lyricsSource = body.lyricsSource;
+      track.markModified('lyricsSource');
     }
     await track.save();
     return this.findByTrackId(trackId);

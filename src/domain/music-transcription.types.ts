@@ -3,6 +3,8 @@
  * media/transcriptions/&lt;trackId&gt;/) + campos de runtime em MusicAiDemoPayload.
  */
 
+export type LyricsSource = 'AI' | 'MATCH';
+
 export interface TranscriptionChordEvent {
   start: number;
   end: number;
@@ -45,15 +47,6 @@ export interface TranscriptionLyricSegment {
   words?: TranscriptionLyricWord[];
 }
 
-/**
- * Letras por origem: `ai` (AI/lyrics.json) e `match` (Match/lyrics.json, alinhamento por busca).
- * Qualquer chave pode estar ausente se essa variante não existir.
- */
-export interface TranscriptionLyricsVariants {
-  ai?: TranscriptionLyricSegment[];
-  match?: TranscriptionLyricSegment[];
-}
-
 export interface TranscriptionSection {
   start: number;
   end: number;
@@ -65,7 +58,6 @@ export interface MusicTranscriptionMeta {
   name?: string;
   sourcePathParam?: string;
   trackId?: string;
-  lyricsVariant?: string;
   audioUrl?: string;
   duration_seconds?: number;
 }
@@ -76,9 +68,8 @@ export interface MusicTranscriptionMeta {
  */
 export interface MusicTranscriptionPayload {
   chords?: TranscriptionChordEvent[];
-  /** @deprecated Preferir `lyricsVariants`. Se enviado sem `lyricsVariants`, a API trata como `match`. */
   lyrics?: TranscriptionLyricSegment[];
-  lyricsVariants?: TranscriptionLyricsVariants;
+  lyricsSource?: LyricsSource;
   sections?: TranscriptionSection[];
   meta?: MusicTranscriptionMeta;
   chordTimeOffsetSec?: number;

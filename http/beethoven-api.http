@@ -9,7 +9,7 @@ Content-Type: application/json
   "name": "Matchbox Twenty"
 }
 
-### 2) Inserir faixa all_i_need (lyricsVariants: match + ai)
+### 2) Inserir faixa all_i_need (`lyrics` + `lyricsSource`; ver payload-all-i-need.json)
 # Antes: substitua artistId em ./payload-all-i-need.json pelo _id devolvido acima (24 caracteres hex).
 #
 # Campos opcionais de versão / Pro (pode acrescentar ao JSON do ficheiro):

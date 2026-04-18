@@ -71,18 +71,8 @@ const TranscriptionLyricSegmentSchema = SchemaFactory.createForClass(
   TranscriptionLyricSegmentSubdoc,
 );
 
-@Schema({ _id: false })
-export class TranscriptionLyricsVariantsSubdoc {
-  @Prop({ type: [TranscriptionLyricSegmentSchema], default: undefined })
-  ai?: TranscriptionLyricSegmentSubdoc[];
-
-  @Prop({ type: [TranscriptionLyricSegmentSchema], default: undefined })
-  match?: TranscriptionLyricSegmentSubdoc[];
-}
-
-const TranscriptionLyricsVariantsSchema = SchemaFactory.createForClass(
-  TranscriptionLyricsVariantsSubdoc,
-);
+export const LYRICS_SOURCE_VALUES = ['AI', 'MATCH'] as const;
+export type LyricsSource = (typeof LYRICS_SOURCE_VALUES)[number];
 
 @Schema({ _id: false })
 export class TranscriptionSectionSubdoc {
@@ -101,7 +91,6 @@ export class MusicTranscriptionMetaSubdoc {
   @Prop() name?: string;
   @Prop() sourcePathParam?: string;
   @Prop() trackId?: string;
-  @Prop() lyricsVariant?: string;
   @Prop() audioUrl?: string;
   @Prop() duration_seconds?: number;
 }
@@ -147,8 +136,15 @@ export class Track {
   @Prop({ type: [TranscriptionChordEventSchema], default: [] })
   chords: TranscriptionChordEventSubdoc[];
 
-  @Prop({ type: TranscriptionLyricsVariantsSchema, required: false })
-  lyricsVariants?: TranscriptionLyricsVariantsSubdoc;
+  @Prop({ type: [TranscriptionLyricSegmentSchema], default: undefined })
+  lyrics?: TranscriptionLyricSegmentSubdoc[];
+
+  @Prop({
+    type: String,
+    enum: LYRICS_SOURCE_VALUES,
+    required: false,
+  })
+  lyricsSource?: LyricsSource;
 
   @Prop({ type: [TranscriptionSectionSchema], default: [] })
   sections: TranscriptionSectionSubdoc[];

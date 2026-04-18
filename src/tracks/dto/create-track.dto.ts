@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsMongoId,
   IsNumber,
@@ -10,10 +11,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import type {
-  MusicTranscriptionPayload,
-  TranscriptionLyricsVariants,
-} from '../../domain/music-transcription.types';
+import type { LyricsSource, MusicTranscriptionPayload } from '../../domain/music-transcription.types';
 
 class MusicTranscriptionMetaDto {
   @IsOptional()
@@ -31,10 +29,6 @@ class MusicTranscriptionMetaDto {
   @IsOptional()
   @IsString()
   trackId?: string;
-
-  @IsOptional()
-  @IsString()
-  lyricsVariant?: string;
 
   @IsOptional()
   @IsString()
@@ -95,13 +89,14 @@ export class CreateTrackDto {
   @IsOptional()
   chords?: MusicTranscriptionPayload['chords'];
 
-  /** Variantes: `ai` (export AI/) e `match` (export Match/, letra por busca). */
-  @IsOptional()
-  lyricsVariants?: TranscriptionLyricsVariants;
-
-  /** @deprecated Usar `lyricsVariants.match`. Mantido para payloads antigos. */
+  /** Segmentos de letra sincronizada. */
   @IsOptional()
   lyrics?: MusicTranscriptionPayload['lyrics'];
+
+  /** Origem da letra: transcrição IA ou alinhamento por match (LRCLIB / busca). */
+  @IsOptional()
+  @IsIn(['AI', 'MATCH'])
+  lyricsSource?: LyricsSource;
 
   @IsOptional()
   sections?: MusicTranscriptionPayload['sections'];
