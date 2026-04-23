@@ -122,6 +122,21 @@ export class Track {
   @Prop({ trim: true, index: true })
   userId?: string;
 
+  /** ID público da cifra base (Schubert) da qual esta versão foi criada. */
+  @Prop({ trim: true, index: true })
+  variationOfTrackId?: string;
+
+  /** Rótulo opcional da versão (ex.: "Acústico · capo 2"). */
+  @Prop({ trim: true, default: '' })
+  variationLabel?: string;
+
+  /** Slugs da cifra base para abrir `/cifras/:artist/:song` sem lookup extra. */
+  @Prop({ trim: true, index: true })
+  baseArtistSlug?: string;
+
+  @Prop({ trim: true, index: true })
+  baseSongSlug?: string;
+
   /** Afinação original da cifra (texto livre para a sidebar, ex.: «E standard»). */
   @Prop({ trim: true, default: '' })
   original_tune?: string;
@@ -154,6 +169,9 @@ export class Track {
 
   @Prop({ required: false })
   chordTimeOffsetSec?: number;
+
+  @Prop({ trim: true, required: false })
+  coverImageUrl?: string;
 }
 
 export const TrackSchema = SchemaFactory.createForClass(Track);

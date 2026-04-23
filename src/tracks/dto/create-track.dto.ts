@@ -11,7 +11,10 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import type { LyricsSource, MusicTranscriptionPayload } from '../../domain/music-transcription.types';
+import type {
+  LyricsSource,
+  MusicTranscriptionPayload,
+} from '../../domain/music-transcription.types';
 
 class MusicTranscriptionMetaDto {
   @IsOptional()
@@ -72,6 +75,22 @@ export class CreateTrackDto {
 
   @IsOptional()
   @IsString()
+  variationOfTrackId?: string;
+
+  @IsOptional()
+  @IsString()
+  variationLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  baseArtistSlug?: string;
+
+  @IsOptional()
+  @IsString()
+  baseSongSlug?: string;
+
+  @IsOptional()
+  @IsString()
   original_tune?: string;
 
   @IsOptional()
@@ -109,4 +128,8 @@ export class CreateTrackDto {
   @IsOptional()
   @IsNumber()
   chordTimeOffsetSec?: number;
+
+  @IsOptional()
+  @IsString()
+  coverImageUrl?: string;
 }

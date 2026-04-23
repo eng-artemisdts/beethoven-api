@@ -15,9 +15,13 @@ export class LibraryHomeController {
     const parsedPage = Number.parseInt(page ?? '', 10);
     const parsedLimit = Number.parseInt(limit ?? '', 10);
     const safePage =
-      Number.isFinite(parsedPage) && parsedPage > 0 ? Math.min(parsedPage, 10_000) : 1;
+      Number.isFinite(parsedPage) && parsedPage > 0
+        ? Math.min(parsedPage, 10_000)
+        : 1;
     const safeLimit =
-      Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : 12;
+      Number.isFinite(parsedLimit) && parsedLimit > 0
+        ? Math.min(parsedLimit, 50)
+        : 12;
     return this.libraryHomeService.searchTracks({
       search: search ?? '',
       page: safePage,

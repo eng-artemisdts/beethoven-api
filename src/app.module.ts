@@ -35,4 +35,4 @@ import { TracksModule } from './tracks/tracks.module';
   //     : { provide: APP_GUARD, useClass: JwtAuthGuard },
   // ],
 })
-export class AppModule { }
+export class AppModule {}

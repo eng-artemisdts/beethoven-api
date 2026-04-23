@@ -34,5 +34,8 @@ export const LibraryTrackAccessSchema =
   SchemaFactory.createForClass(LibraryTrackAccess);
 
 /** Uma entrada por utilizador e faixa (identificador Schubert). */
-LibraryTrackAccessSchema.index({ userId: 1, trackKey: 1 }, { unique: true, sparse: true });
+LibraryTrackAccessSchema.index(
+  { userId: 1, trackKey: 1 },
+  { unique: true, sparse: true },
+);
 LibraryTrackAccessSchema.index({ userId: 1, lastAccessAt: -1 });
