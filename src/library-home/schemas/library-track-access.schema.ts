@@ -28,6 +28,13 @@ export class LibraryTrackAccess {
 
   @Prop({ default: Date.now, index: true })
   lastAccessAt?: Date;
+
+  /** Marca se a faixa foi adicionada em "Salvar na minha biblioteca". */
+  @Prop({ default: false, index: true })
+  isSaved?: boolean;
+
+  @Prop()
+  savedAt?: Date;
 }
 
 export const LibraryTrackAccessSchema =
@@ -39,3 +46,4 @@ LibraryTrackAccessSchema.index(
   { unique: true, sparse: true },
 );
 LibraryTrackAccessSchema.index({ userId: 1, lastAccessAt: -1 });
+LibraryTrackAccessSchema.index({ userId: 1, isSaved: 1, lastAccessAt: -1 });

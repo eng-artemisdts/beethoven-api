@@ -22,6 +22,14 @@ function canonicalTrackOnlyClause(): Record<string, unknown> {
   };
 }
 
+function buildCifraHref(artistSlug: string, songSlug: string): string {
+  return `/cifras/${encodeURIComponent(artistSlug)}/${encodeURIComponent(songSlug)}`;
+}
+
+function buildCifraEditHref(artistSlug: string, songSlug: string): string {
+  return `/cifras/${encodeURIComponent(artistSlug)}/${encodeURIComponent(songSlug)}/edit`;
+}
+
 export type LibrarySearchTrackRow = {
   id: string;
   trackKey: string | null;
@@ -37,6 +45,40 @@ export type LibrarySearchResponse = {
   page: number;
   limit: number;
   totalPages: number;
+};
+
+export type LibraryCatalogTab = 'musicas' | 'artistas' | 'albuns' | 'playlists';
+
+export type LibraryCatalogTrackItem = {
+  id: string;
+  trackKey: string | null;
+  name: string;
+  artistName: string;
+  artistId: string;
+  imageUrl: string | null;
+  isPrivate: boolean;
+  isSaved: boolean;
+  hasMyVersion: boolean;
+  isOwnerVersion: boolean;
+  accessHref: string | null;
+  editHref: string | null;
+  updatedAt: string | null;
+};
+
+export type LibraryCatalogArtistItem = {
+  id: string;
+  artistName: string;
+  artistId: string;
+  imageUrl: string | null;
+  tracksCount: number;
+  hasMyVersion: boolean;
+};
+
+export type LibraryCatalogResponse = {
+  tab: LibraryCatalogTab;
+  tracks: LibraryCatalogTrackItem[];
+  artists: LibraryCatalogArtistItem[];
+  total: number;
 };
 
 @Injectable()
@@ -217,6 +259,63 @@ export class LibraryHomeService {
     );
   }
 
+  async saveTrackByKey(params: {
+    userId: string;
+    trackKey: string;
+  }): Promise<void> {
+    const userId = params.userId.trim();
+    const key = params.trackKey.trim();
+    if (!userId || !key) return;
+
+    const track = await this.trackModel
+      .findOne({ trackId: key })
+      .select('_id')
+      .exec();
+
+    const now = new Date();
+    const $set: Record<string, unknown> = {
+      lastAccessAt: now,
+      trackKey: key,
+      isSaved: true,
+      savedAt: now,
+    };
+    if (track) {
+      $set.trackId = track._id;
+    }
+
+    await this.trackAccessModel.updateOne(
+      { userId, trackKey: key },
+      {
+        $set,
+        $setOnInsert: { firstAccessAt: now },
+        $inc: { accessCount: 1 },
+      },
+      { upsert: true },
+    );
+  }
+
+  async unregisterTrackAccessByKey(params: {
+    userId: string;
+    trackKey: string;
+  }): Promise<void> {
+    const userId = params.userId.trim();
+    const key = params.trackKey.trim();
+    if (!userId || !key) return;
+    await this.trackAccessModel
+      .updateOne(
+        { userId, trackKey: key },
+        {
+          $set: {
+            isSaved: false,
+          },
+          $unset: {
+            savedAt: '',
+          },
+        },
+      )
+      .exec();
+  }
+
   private serializeSearchTrack(track: TrackDocument): LibrarySearchTrackRow {
     const populated = track.artistId as unknown as
       | ArtistDocument
@@ -305,6 +404,176 @@ export class LibraryHomeService {
       page,
       limit,
       totalPages,
+    };
+  }
+
+  async listCatalog(params: {
+    userId?: string;
+    tab: LibraryCatalogTab;
+    limit?: number;
+  }): Promise<LibraryCatalogResponse> {
+    const userId = params.userId?.trim() || '';
+    const limit = Math.max(1, Math.min(params.limit ?? 200, 300));
+
+    const accessFilter = userId ? { userId } : null;
+    const accesses = accessFilter
+      ? await this.trackAccessModel
+          .find({ ...accessFilter, isSaved: true })
+          .sort({ lastAccessAt: -1, _id: -1 })
+          .limit(limit * 4)
+          .select('trackId trackKey')
+          .exec()
+      : [];
+
+    const savedTrackIdSet = new Set<string>();
+    const savedTrackKeySet = new Set<string>();
+    for (const access of accesses) {
+      if (access.trackId) savedTrackIdSet.add(String(access.trackId));
+      const k =
+        typeof access.trackKey === 'string' && access.trackKey.trim()
+          ? access.trackKey.trim()
+          : '';
+      if (k) savedTrackKeySet.add(k);
+    }
+
+    const myTracks = userId
+      ? await this.trackModel
+          .find({ userId })
+          .select('_id trackId variationOfTrackId')
+          .exec()
+      : [];
+    const myVariationBaseKeys = new Set<string>();
+    for (const track of myTracks) {
+      const baseKey =
+        typeof track.variationOfTrackId === 'string' &&
+        track.variationOfTrackId.trim()
+          ? track.variationOfTrackId.trim()
+          : '';
+      if (baseKey) myVariationBaseKeys.add(baseKey);
+    }
+
+    const visibilityClause = userId
+      ? {
+          $or: [
+            { _id: { $in: [...savedTrackIdSet] } },
+            { trackId: { $in: [...savedTrackKeySet] } },
+          ],
+        }
+      : { is_private: { $ne: true } };
+
+    const documents = await this.trackModel
+      .find(visibilityClause)
+      .populate('artistId', 'name')
+      .sort({ updatedAt: -1, _id: -1 })
+      .limit(limit)
+      .exec();
+
+    const trackRows: LibraryCatalogTrackItem[] = documents.map((doc) => {
+      const serialized = this.serializeSearchTrack(doc);
+      const key =
+        typeof doc.trackId === 'string' && doc.trackId.trim() ? doc.trackId.trim() : '';
+      const ownerSub = typeof doc.userId === 'string' ? doc.userId.trim() : '';
+      const isVariation =
+        typeof doc.variationOfTrackId === 'string' &&
+        doc.variationOfTrackId.trim().length > 0;
+      const isOwnerVersion = Boolean(userId && isVariation && ownerSub === userId);
+      const baseKey =
+        typeof doc.variationOfTrackId === 'string' && doc.variationOfTrackId.trim()
+          ? doc.variationOfTrackId.trim()
+          : key;
+      const isSaved = Boolean(
+        savedTrackIdSet.has(String(doc._id)) || (key && savedTrackKeySet.has(key)),
+      );
+      const updatedAtRaw = (doc as unknown as { updatedAt?: Date | string })
+        .updatedAt;
+      const baseArtistSlug =
+        typeof doc.baseArtistSlug === 'string' ? doc.baseArtistSlug.trim() : '';
+      const baseSongSlug =
+        typeof doc.baseSongSlug === 'string' ? doc.baseSongSlug.trim() : '';
+      const hrefBase =
+        baseArtistSlug && baseSongSlug
+          ? buildCifraHref(baseArtistSlug, baseSongSlug)
+          : baseKey
+            ? `/cifras?trackId=${encodeURIComponent(baseKey)}`
+            : null;
+      const hrefEditBase =
+        baseArtistSlug && baseSongSlug
+          ? buildCifraEditHref(baseArtistSlug, baseSongSlug)
+          : key
+            ? `/cifras/edit?trackId=${encodeURIComponent(key)}`
+            : null;
+      const accessHref =
+        isOwnerVersion && hrefBase && key
+          ? `${hrefBase}?v=${encodeURIComponent(key)}`
+          : hrefBase;
+      const editHref =
+        isOwnerVersion && hrefEditBase
+          ? key
+            ? `${hrefEditBase}?v=${encodeURIComponent(key)}`
+            : hrefEditBase
+          : null;
+      return {
+        ...serialized,
+        imageUrl:
+          typeof doc.coverImageUrl === 'string' && doc.coverImageUrl.trim()
+            ? doc.coverImageUrl.trim()
+            : null,
+        isPrivate: doc.is_private === true,
+        isSaved,
+        hasMyVersion: Boolean(baseKey && myVariationBaseKeys.has(baseKey)),
+        isOwnerVersion,
+        accessHref,
+        editHref,
+        updatedAt: updatedAtRaw ? new Date(updatedAtRaw).toISOString() : null,
+      };
+    });
+
+    if (params.tab === 'musicas') {
+      return {
+        tab: params.tab,
+        tracks: trackRows,
+        artists: [],
+        total: trackRows.length,
+      };
+    }
+
+    if (params.tab === 'artistas') {
+      const grouped = new Map<string, LibraryCatalogArtistItem>();
+      for (const row of trackRows) {
+        const key = row.artistId || row.artistName;
+        if (!key) continue;
+        const current = grouped.get(key);
+        if (!current) {
+          grouped.set(key, {
+            id: key,
+            artistId: row.artistId,
+            artistName: row.artistName,
+            imageUrl: row.imageUrl,
+            tracksCount: 1,
+            hasMyVersion: row.hasMyVersion,
+          });
+          continue;
+        }
+        current.tracksCount += 1;
+        current.hasMyVersion = current.hasMyVersion || row.hasMyVersion;
+        if (!current.imageUrl && row.imageUrl) current.imageUrl = row.imageUrl;
+      }
+      const artists = [...grouped.values()].sort((a, b) =>
+        a.artistName.localeCompare(b.artistName, 'pt-BR'),
+      );
+      return {
+        tab: params.tab,
+        tracks: [],
+        artists,
+        total: artists.length,
+      };
+    }
+
+    return {
+      tab: params.tab,
+      tracks: [],
+      artists: [],
+      total: 0,
     };
   }
 }

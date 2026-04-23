@@ -371,4 +371,27 @@ export class TracksService {
     await track.save();
     return this.findByTrackId(trackId);
   }
+
+  async deleteVariationByTrackId(
+    ownerSub: string,
+    trackId: string,
+  ): Promise<{ ok: true }> {
+    const normalizedSub = ownerSub.trim();
+    const normalizedTrackId = trackId.trim();
+    if (!normalizedSub || !normalizedTrackId) {
+      throw new BadRequestException('Parâmetros inválidos para exclusão.');
+    }
+    const track = await this.findByTrackId(normalizedTrackId);
+    const owner = typeof track.userId === 'string' ? track.userId.trim() : '';
+    if (!owner || owner !== normalizedSub) {
+      throw new ForbiddenException(
+        'Apenas o criador pode excluir esta variação.',
+      );
+    }
+    if (!track.variationOfTrackId?.trim()) {
+      throw new BadRequestException('A faixa indicada não é uma variação.');
+    }
+    await this.trackModel.deleteOne({ _id: track._id }).exec();
+    return { ok: true };
+  }
 }

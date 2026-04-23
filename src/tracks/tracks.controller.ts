@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -114,6 +115,19 @@ export class TracksController {
       lyrics: body.lyrics,
       lyricsSource: body.lyricsSource,
     });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('variations/by-track-id/:trackId')
+  async deleteVariationByTrackId(
+    @Req() req: Request,
+    @Param('trackId') trackId: string,
+  ) {
+    const ownerSub = this.resolveUserSub(req);
+    if (!ownerSub) {
+      throw new UnauthorizedException('Sessão inválida: sub ausente.');
+    }
+    return this.tracksService.deleteVariationByTrackId(ownerSub, trackId);
   }
 
   @UseGuards(JwtAuthGuard)
