@@ -471,18 +471,24 @@ export class LibraryHomeService {
     const trackRows: LibraryCatalogTrackItem[] = documents.map((doc) => {
       const serialized = this.serializeSearchTrack(doc);
       const key =
-        typeof doc.trackId === 'string' && doc.trackId.trim() ? doc.trackId.trim() : '';
+        typeof doc.trackId === 'string' && doc.trackId.trim()
+          ? doc.trackId.trim()
+          : '';
       const ownerSub = typeof doc.userId === 'string' ? doc.userId.trim() : '';
       const isVariation =
         typeof doc.variationOfTrackId === 'string' &&
         doc.variationOfTrackId.trim().length > 0;
-      const isOwnerVersion = Boolean(userId && isVariation && ownerSub === userId);
+      const isOwnerVersion = Boolean(
+        userId && isVariation && ownerSub === userId,
+      );
       const baseKey =
-        typeof doc.variationOfTrackId === 'string' && doc.variationOfTrackId.trim()
+        typeof doc.variationOfTrackId === 'string' &&
+        doc.variationOfTrackId.trim()
           ? doc.variationOfTrackId.trim()
           : key;
       const isSaved = Boolean(
-        savedTrackIdSet.has(String(doc._id)) || (key && savedTrackKeySet.has(key)),
+        savedTrackIdSet.has(String(doc._id)) ||
+        (key && savedTrackKeySet.has(key)),
       );
       const updatedAtRaw = (doc as unknown as { updatedAt?: Date | string })
         .updatedAt;
