@@ -20,14 +20,14 @@ export class TracksService {
   constructor(
     @InjectModel(Track.name) private readonly trackModel: Model<TrackDocument>,
     private readonly artistsService: ArtistsService,
-  ) {}
+  ) { }
 
   /** Deriva `lyrics` + `lyricsSource` a partir do DTO (`lyricsSource` omisso ⇒ `MATCH`). */
   private resolveLyricsPayload(dto: CreateTrackDto):
     | {
-        lyrics: TranscriptionLyricSegmentSubdoc[];
-        lyricsSource: LyricsSource;
-      }
+      lyrics: TranscriptionLyricSegmentSubdoc[];
+      lyricsSource: LyricsSource;
+    }
     | undefined {
     const newLyrics = dto.lyrics;
     const newSource = dto.lyricsSource;
@@ -97,9 +97,9 @@ export class TracksService {
       ...rest,
       ...(resolvedLyrics
         ? {
-            lyrics: resolvedLyrics.lyrics,
-            lyricsSource: resolvedLyrics.lyricsSource,
-          }
+          lyrics: resolvedLyrics.lyrics,
+          lyricsSource: resolvedLyrics.lyricsSource,
+        }
         : {}),
       artistId: new Types.ObjectId(artistId),
     });
@@ -270,7 +270,7 @@ export class TracksService {
           : undefined,
       chordTimeOffsetSec:
         Number.isFinite(source.chordTimeOffsetSec as number) &&
-        Number(source.chordTimeOffsetSec) >= 0
+          Number(source.chordTimeOffsetSec) >= 0
           ? Number(source.chordTimeOffsetSec)
           : undefined,
       coverImageUrl: this.sanitizeOptionalString(source.coverImageUrl),

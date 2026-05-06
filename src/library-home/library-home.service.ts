@@ -442,8 +442,16 @@ export class LibraryHomeService {
           .select('_id trackId variationOfTrackId')
           .exec()
       : [];
+    const myTrackIdSet = new Set<string>();
+    const myTrackKeySet = new Set<string>();
     const myVariationBaseKeys = new Set<string>();
     for (const track of myTracks) {
+      myTrackIdSet.add(String(track._id));
+      const myTrackKey =
+        typeof track.trackId === 'string' && track.trackId.trim()
+          ? track.trackId.trim()
+          : '';
+      if (myTrackKey) myTrackKeySet.add(myTrackKey);
       const baseKey =
         typeof track.variationOfTrackId === 'string' &&
         track.variationOfTrackId.trim()
@@ -457,6 +465,9 @@ export class LibraryHomeService {
           $or: [
             { _id: { $in: [...savedTrackIdSet] } },
             { trackId: { $in: [...savedTrackKeySet] } },
+            { _id: { $in: [...myTrackIdSet] } },
+            { trackId: { $in: [...myTrackKeySet] } },
+            { userId },
           ],
         }
       : { is_private: { $ne: true } };
