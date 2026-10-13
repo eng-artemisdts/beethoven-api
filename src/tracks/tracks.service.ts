@@ -290,7 +290,11 @@ export class TracksService {
     const track = await this.findByTrackId(trackId);
     if (body.chords !== undefined) {
       const durationSec = track.meta?.duration_seconds;
-      track.chords = normalizeChordListFromClient(body.chords, durationSec);
+      track.chords = normalizeChordListFromClient(
+        body.chords,
+        durationSec,
+        track.chords,
+      );
       track.markModified('chords');
     }
     if (body.lyrics !== undefined) {
@@ -331,7 +335,11 @@ export class TracksService {
     }
     if (body.chords !== undefined) {
       const durationSec = track.meta?.duration_seconds;
-      track.chords = normalizeChordListFromClient(body.chords, durationSec);
+      track.chords = normalizeChordListFromClient(
+        body.chords,
+        durationSec,
+        track.chords,
+      );
       track.markModified('chords');
     }
     if (body.lyrics !== undefined) {
