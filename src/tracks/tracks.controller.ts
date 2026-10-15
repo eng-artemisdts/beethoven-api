@@ -13,9 +13,11 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import type { LyricsSource } from '../domain/music-transcription.types';
 import { CreateTrackDto } from './dto/create-track.dto';
 import { TracksService } from './tracks.service';
+import { withVariationPermissions } from './variation-permissions';
 
 @Controller('tracks')
 export class TracksController {
@@ -63,30 +65,37 @@ export class TracksController {
     return this.tracksService.findByTrackId(trackId);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('variations/by-track-id/:trackId')
-  findVariationByTrackId(
+  async findVariationByTrackId(
     @Param('trackId') trackId: string,
     @Req() req: Request,
   ) {
     const viewerSub = this.resolveUserSub(req) || undefined;
-    return this.tracksService.findVariationByTrackId(trackId, viewerSub);
+    const track = await this.tracksService.findVariationByTrackId(
+      trackId,
+      viewerSub,
+    );
+    return withVariationPermissions(track, viewerSub);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('variations/by-base-key/:baseTrackId')
-  findVariationsByBaseKey(
+  async findVariationsByBaseKey(
     @Param('baseTrackId') baseTrackId: string,
     @Req() req: Request,
   ) {
     const viewerSub = this.resolveUserSub(req) || undefined;
-    return this.tracksService.findVariationsByBaseTrackId(
+    const tracks = await this.tracksService.findVariationsByBaseTrackId(
       baseTrackId,
       viewerSub,
     );
+    return tracks.map((track) => withVariationPermissions(track, viewerSub));
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('variations/my/by-base-key/:baseTrackId')
-  findMyVariationByBaseKey(
+  async findMyVariationByBaseKey(
     @Param('baseTrackId') baseTrackId: string,
     @Req() req: Request,
   ) {
@@ -94,10 +103,11 @@ export class TracksController {
     if (!ownerSub) {
       throw new UnauthorizedException('Sessão inválida: sub ausente.');
     }
-    return this.tracksService.findMyVariationByBaseTrackId(
+    const track = await this.tracksService.findMyVariationByBaseTrackId(
       baseTrackId,
       ownerSub,
     );
+    return track ? withVariationPermissions(track, ownerSub) : null;
   }
 
   @Patch('by-track-id/:trackId')

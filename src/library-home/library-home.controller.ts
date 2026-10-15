@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { LibraryHomeService } from './library-home.service';
 
 @Controller('library-home')
@@ -47,9 +48,11 @@ export class LibraryHomeController {
     });
   }
 
+  /** Utilizador vem do token (visitante sem token); `userId` na query é ignorado. */
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('catalog')
   getCatalog(
-    @Query('userId') userId?: string,
+    @Req() req: Request,
     @Query('tab') tab?: string,
     @Query('limit') limit?: string,
   ) {
@@ -63,15 +66,17 @@ export class LibraryHomeController {
         ? tab
         : 'musicas';
     return this.libraryHomeService.listCatalog({
-      userId,
+      userId: this.resolveUserSub(req) || undefined,
       tab: normalizedTab,
       limit: safeLimit,
     });
   }
 
+  /** Utilizador vem do token (visitante sem token); `userId` na query é ignorado. */
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
   getHomeFeed(
-    @Query('userId') userId?: string,
+    @Req() req: Request,
     @Query('recommendedLimit') recommendedLimit?: string,
     @Query('recentLimit') recentLimit?: string,
   ) {
@@ -86,7 +91,7 @@ export class LibraryHomeController {
         ? Math.min(parsedRecentLimit, 30)
         : 8;
     return this.libraryHomeService.getHomeFeed({
-      userId,
+      userId: this.resolveUserSub(req) || undefined,
       recommendedLimit: safeRecommendedLimit,
       recentLimit: safeRecentLimit,
     });

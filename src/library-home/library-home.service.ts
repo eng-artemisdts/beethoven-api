@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Artist, ArtistDocument } from '../artists/schemas/artist.schema';
 import { Track, TrackDocument } from '../tracks/schemas/track.schema';
+import { variationPermissions } from '../tracks/variation-permissions';
 import {
   LibraryTrackAccess,
   LibraryTrackAccessDocument,
@@ -60,6 +61,9 @@ export type LibraryCatalogTrackItem = {
   isSaved: boolean;
   hasMyVersion: boolean;
   isOwnerVersion: boolean;
+  /** Só variações do próprio utilizador; a cifra base importada por ele não conta. */
+  canEdit: boolean;
+  canDelete: boolean;
   accessHref: string | null;
   editHref: string | null;
   updatedAt: string | null;
@@ -492,6 +496,7 @@ export class LibraryHomeService {
       const isOwnerVersion = Boolean(
         userId && isVariation && ownerSub === userId,
       );
+      const permissions = variationPermissions(doc, userId);
       const baseKey =
         typeof doc.variationOfTrackId === 'string' &&
         doc.variationOfTrackId.trim()
@@ -539,6 +544,8 @@ export class LibraryHomeService {
         isSaved,
         hasMyVersion: Boolean(baseKey && myVariationBaseKeys.has(baseKey)),
         isOwnerVersion,
+        canEdit: permissions.canEdit,
+        canDelete: permissions.canDelete,
         accessHref,
         editHref,
         updatedAt: updatedAtRaw ? new Date(updatedAtRaw).toISOString() : null,

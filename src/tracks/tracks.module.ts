@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ArtistsModule } from '../artists/artists.module';
 import { AuthModule } from '../auth/auth.module';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { Track, TrackSchema } from './schemas/track.schema';
 import { TracksController } from './tracks.controller';
 import { TracksService } from './tracks.service';
@@ -14,6 +15,6 @@ import { TracksService } from './tracks.service';
     MongooseModule.forFeature([{ name: Track.name, schema: TrackSchema }]),
   ],
   controllers: [TracksController],
-  providers: [TracksService, JwtAuthGuard],
+  providers: [TracksService, JwtAuthGuard, OptionalJwtAuthGuard],
 })
 export class TracksModule {}
