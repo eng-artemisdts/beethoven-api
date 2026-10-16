@@ -1,16 +1,16 @@
 export type VariationPermissions = {
-  /** O visitante pode gravar alterações nesta faixa como variação sua. */
+  /** O visitante pode gravar alterações nesta faixa (é ele quem a criou). */
   canEdit: boolean;
-  /** O visitante pode excluir esta faixa (só variações que ele criou). */
+  /** O visitante pode excluir esta faixa (é ele quem a criou). */
   canDelete: boolean;
-  /** API dona do documento: variações são sempre da Beethoven. */
-  source: 'beethoven';
+  /** API dona do documento: variações são da Beethoven; a cifra base é do Schubert. */
+  source: 'beethoven' | 'schubert';
 };
 
 /**
- * Permissões do visitante sobre uma faixa. Só variações (`variationOfTrackId`) do próprio
- * utilizador podem ser editadas ou excluídas aqui; a cifra base pertence ao Schubert, mesmo
- * quando o visitante foi quem a importou.
+ * Permissões do visitante sobre uma faixa: quem a criou edita e exclui — a sua variação ou a
+ * cifra base que importou. A exclusão de uma base ainda é recusada no servidor quando outras
+ * pessoas criaram versões a partir dela.
  */
 export function variationPermissions(
   track: { userId?: unknown; variationOfTrackId?: unknown },
@@ -21,8 +21,12 @@ export function variationPermissions(
   const isVariation =
     typeof track.variationOfTrackId === 'string' &&
     track.variationOfTrackId.trim().length > 0;
-  const mine = Boolean(viewer && isVariation && owner === viewer);
-  return { canEdit: mine, canDelete: mine, source: 'beethoven' };
+  const mine = Boolean(viewer && owner === viewer);
+  return {
+    canEdit: mine,
+    canDelete: mine,
+    source: isVariation ? 'beethoven' : 'schubert',
+  };
 }
 
 /** Serializa o documento (igual à resposta padrão do Nest) e acrescenta as permissões do visitante. */

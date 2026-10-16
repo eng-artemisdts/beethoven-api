@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -12,6 +13,10 @@ import type { LyricsSource } from '../domain/music-transcription.types';
 import { ArtistsService } from '../artists/artists.service';
 import { CreateTrackDto } from './dto/create-track.dto';
 import type { TranscriptionLyricSegmentSubdoc } from './schemas/track.schema';
+import {
+  LibraryTrackAccess,
+  LibraryTrackAccessDocument,
+} from '../library-home/schemas/library-track-access.schema';
 import { Track, TrackDocument } from './schemas/track.schema';
 import { normalizeChordListFromClient } from './transcription-chord-normalize.util';
 
@@ -20,6 +25,8 @@ export class TracksService {
   constructor(
     @InjectModel(Track.name) private readonly trackModel: Model<TrackDocument>,
     private readonly artistsService: ArtistsService,
+    @InjectModel(LibraryTrackAccess.name)
+    private readonly trackAccessModel: Model<LibraryTrackAccessDocument>,
   ) { }
 
   /** Deriva `lyrics` + `lyricsSource` a partir do DTO (`lyricsSource` omisso ⇒ `MATCH`). */
@@ -380,6 +387,11 @@ export class TracksService {
     return this.findByTrackId(trackId);
   }
 
+  /**
+   * Exclui uma faixa do próprio utilizador: uma variação ou a cifra base que ele importou.
+   * A base só sai se ninguém mais criou versões a partir dela; as versões do próprio utilizador
+   * e os registos de biblioteca (de qualquer pessoa) que apontam para ela saem junto.
+   */
   async deleteVariationByTrackId(
     ownerSub: string,
     trackId: string,
@@ -393,13 +405,46 @@ export class TracksService {
     const owner = typeof track.userId === 'string' ? track.userId.trim() : '';
     if (!owner || owner !== normalizedSub) {
       throw new ForbiddenException(
-        'Apenas o criador pode excluir esta variação.',
+        'Apenas quem criou esta cifra pode excluí-la.',
       );
     }
-    if (!track.variationOfTrackId?.trim()) {
-      throw new BadRequestException('A faixa indicada não é uma variação.');
+    if (track.variationOfTrackId?.trim()) {
+      await this.trackModel.deleteOne({ _id: track._id }).exec();
+      return { ok: true };
     }
-    await this.trackModel.deleteOne({ _id: track._id }).exec();
+
+    const baseKey = track.trackId?.trim() || normalizedTrackId;
+    const othersVersions = await this.trackModel
+      .countDocuments({
+        variationOfTrackId: baseKey,
+        userId: { $ne: normalizedSub },
+      })
+      .exec();
+    if (othersVersions > 0) {
+      throw new ConflictException(
+        'Outras pessoas criaram versões a partir desta cifra, por isso ela não pode ser excluída.',
+      );
+    }
+    const ownVersions = await this.trackModel
+      .find({ variationOfTrackId: baseKey, userId: normalizedSub })
+      .select('_id trackId')
+      .exec();
+    const trackObjectIds = [track._id, ...ownVersions.map((v) => v._id)];
+    const trackKeys = [
+      baseKey,
+      ...ownVersions
+        .map((v) => (typeof v.trackId === 'string' ? v.trackId.trim() : ''))
+        .filter(Boolean),
+    ];
+    await this.trackAccessModel
+      .deleteMany({
+        $or: [
+          { trackKey: { $in: trackKeys } },
+          { trackId: { $in: trackObjectIds } },
+        ],
+      })
+      .exec();
+    await this.trackModel.deleteMany({ _id: { $in: trackObjectIds } }).exec();
     return { ok: true };
   }
 }

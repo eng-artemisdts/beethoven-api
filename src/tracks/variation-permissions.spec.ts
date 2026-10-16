@@ -15,14 +15,15 @@ describe('variationPermissions', () => {
     ).toEqual({ canEdit: true, canDelete: true, source: 'beethoven' });
   });
 
-  it('quem importou a cifra base não pode excluí-la como versão', () => {
-    expect(variationPermissions({ userId: OWNER }, OWNER)).toMatchObject({
-      canEdit: false,
-      canDelete: false,
+  it('quem importou a cifra base pode editá-la e excluí-la', () => {
+    expect(variationPermissions({ userId: OWNER }, OWNER)).toEqual({
+      canEdit: true,
+      canDelete: true,
+      source: 'schubert',
     });
     expect(
       variationPermissions({ userId: OWNER, variationOfTrackId: '' }, OWNER),
-    ).toMatchObject({ canDelete: false });
+    ).toMatchObject({ canDelete: true, source: 'schubert' });
   });
 
   it('outro utilizador e visitante não editam nem excluem', () => {
